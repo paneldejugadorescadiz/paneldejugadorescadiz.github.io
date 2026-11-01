@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel de jugadores Cádiz</title>
+  <meta name="description" content="Listado de jugadores de Cádiz de 2003 a 2007 con datos públicos de La Preferente.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1>Panel de jugadores Cádiz</h1>
+      <p class="subtitle">Jugadores de 2003 a 2007 · datos públicos de La Preferente</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="filters" aria-label="Filtros">
+      <div class="field">
+        <label for="q">Buscar por nombre</label>
+        <input id="q" type="search" placeholder="Ej. Pérez" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="year">Año</label>
+        <select id="year"><option value="">Todos</option></select>
+      </div>
+      <div class="field">
+        <label for="club">Club</label>
+        <select id="club"><option value="">Todos</option></select>
+      </div>
+    </section>
+
+    <p id="count" class="count" aria-live="polite">Cargando…</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Nombre</th>
+            <th scope="col">Año</th>
+            <th scope="col">Club</th>
+            <th scope="col">Categoría</th>
+            <th scope="col">Temporada</th>
+            <th scope="col">Fuente</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <p id="empty" class="empty" hidden>No hay jugadores que coincidan con la búsqueda.</p>
+    <div class="more"><button id="more" class="btn" type="button" hidden>Mostrar más</button></div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>Fuente de los datos: <a href="https://www.lapreferente.com/" rel="noopener noreferrer">lapreferente.com</a>.
+         <span id="updated"></span></p>
+      <p><a href="admin.html">Acceso administrador</a></p>
+    </div>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

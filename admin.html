@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Administrador · Panel de jugadores Cádiz</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1>Administrador</h1>
+      <p class="subtitle"><a href="index.html">← Volver al panel</a></p>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Inicio de sesión -->
+    <section id="view-login" class="card" hidden>
+      <h2>Iniciar sesión</h2>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">Correo electrónico</label>
+          <input id="email" type="email" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <input id="password" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="actions"><button class="btn" type="submit">Entrar</button></div>
+        <p id="login-status" class="status" role="status"></p>
+      </form>
+    </section>
+
+    <!-- Sesión iniciada pero sin permisos de administrador -->
+    <section id="view-denied" class="card" hidden>
+      <h2>Sin permisos</h2>
+      <p>Esta cuenta no tiene rol de administrador.</p>
+      <div class="actions"><button id="logout-denied" class="btn secondary" type="button">Cerrar sesión</button></div>
+    </section>
+
+    <!-- Panel de administrador -->
+    <section id="view-panel" class="card" hidden>
+      <h2>Listas de jugadores</h2>
+      <p class="meta">Sesión: <span id="who"></span></p>
+      <p id="meta-info" class="meta">Cargando estado de las listas…</p>
+      <div class="actions">
+        <button id="regenerate" class="btn" type="button">Regenerar listas</button>
+        <button id="logout" class="btn secondary" type="button">Cerrar sesión</button>
+      </div>
+      <p id="panel-status" class="status" role="status"></p>
+    </section>
+  </main>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>

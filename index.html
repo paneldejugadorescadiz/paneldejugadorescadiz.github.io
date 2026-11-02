@@ -4,59 +4,54 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Panel de jugadores Cádiz</title>
-  <meta name="description" content="Listado de jugadores de Cádiz de 2003 a 2007 con datos públicos de La Preferente.">
+  <meta name="description" content="Jugadores de Cádiz de 2003 a 2007 con datos públicos de La Preferente.">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="container">
-      <h1>Panel de jugadores Cádiz</h1>
-      <p class="subtitle">Jugadores de 2003 a 2007 · datos públicos de La Preferente</p>
+  <a class="skip" href="#resultados">Saltar a los resultados</a>
+
+  <header class="hero">
+    <div class="wrap">
+      <h1>Jugadores de Cádiz</h1>
+      <p class="lede">De 2003 a 2007, con datos públicos de La Preferente.</p>
+
+      <form id="search-form" class="search" role="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.5-3.5"></path>
+        </svg>
+        <input id="q" type="search" placeholder="Busca por nombre"
+               autocomplete="off" aria-label="Buscar por nombre">
+      </form>
     </div>
   </header>
 
-  <main class="container">
-    <section class="filters" aria-label="Filtros">
-      <div class="field">
-        <label for="q">Buscar por nombre</label>
-        <input id="q" type="search" placeholder="Ej. Pérez" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="year">Año</label>
-        <select id="year"><option value="">Todos</option></select>
-      </div>
-      <div class="field">
+  <main class="wrap">
+    <section id="controls" class="controls" aria-label="Filtros">
+      <div id="years" class="years" role="group" aria-label="Año de nacimiento"></div>
+      <div class="club-field">
         <label for="club">Club</label>
-        <select id="club"><option value="">Todos</option></select>
+        <select id="club"><option value="">Todos los clubes</option></select>
       </div>
     </section>
 
-    <p id="count" class="count" aria-live="polite">Cargando…</p>
+    <section id="resultados" aria-label="Resultados">
+      <p id="count" class="count" aria-live="polite">Cargando…</p>
+      <ul id="rows" class="players"></ul>
 
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Nombre</th>
-            <th scope="col">Año</th>
-            <th scope="col">Club</th>
-            <th scope="col">Categoría</th>
-            <th scope="col">Temporada</th>
-            <th scope="col">Fuente</th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
-    </div>
+      <div id="empty" class="empty" hidden>
+        <p id="empty-text"></p>
+        <button id="reset" class="btn secondary" type="button">Quitar filtros</button>
+      </div>
 
-    <p id="empty" class="empty" hidden>No hay jugadores que coincidan con la búsqueda.</p>
-    <div class="more"><button id="more" class="btn" type="button" hidden>Mostrar más</button></div>
+      <div class="more"><button id="more" class="btn" type="button" hidden>Mostrar más</button></div>
+    </section>
   </main>
 
   <footer class="site-footer">
-    <div class="container">
-      <p>Fuente de los datos: <a href="https://www.lapreferente.com/" rel="noopener noreferrer">lapreferente.com</a>.
-         <span id="updated"></span></p>
+    <div class="wrap">
+      <p>Fuente de los datos: <a href="https://www.lapreferente.com/" rel="noopener noreferrer">lapreferente.com</a>. <span id="updated"></span></p>
       <p><a href="admin.html">Acceso administrador</a></p>
     </div>
   </footer>

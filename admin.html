@@ -16,9 +16,11 @@
   </header>
 
   <main class="wrap">
-    <!-- Inicio de sesión -->
+    <p id="view-loading" class="count">Cargando…</p>
+
+    <!-- Inicio de sesión de administrador -->
     <section id="view-login" class="panel" hidden>
-      <h2>Iniciar sesión</h2>
+      <h2>Iniciar sesión como administrador</h2>
       <form id="login-form">
         <div class="field">
           <label for="email">Correo electrónico</label>
@@ -33,23 +35,25 @@
       </form>
     </section>
 
-    <!-- Sesión iniciada pero sin permisos de administrador -->
+    <!-- Sesión iniciada pero sin permiso de administrador -->
     <section id="view-denied" class="panel" hidden>
       <h2>Esta cuenta no es de administrador</h2>
       <p class="meta">Cierra la sesión y entra con una cuenta de administrador.</p>
       <div class="actions"><button id="logout-denied" class="btn secondary" type="button">Cerrar sesión</button></div>
     </section>
 
-    <!-- Panel de administrador -->
-    <section id="view-panel" class="panel" hidden>
-      <h2>Listas de jugadores</h2>
+    <!-- Gestión de cuentas -->
+    <section id="view-panel" class="panel wide" hidden>
+      <h2>Cuentas y permisos</h2>
       <p class="meta">Sesión de <span id="who"></span></p>
-      <p id="meta-info" class="meta">Cargando estado de las listas…</p>
-      <div class="actions">
-        <button id="regenerate" class="btn" type="button">Regenerar listas</button>
-        <button id="logout" class="btn secondary" type="button">Cerrar sesión</button>
-      </div>
+      <ul id="accounts" class="accounts"></ul>
+      <p id="accounts-empty" class="meta" hidden>Todavía no hay cuentas.</p>
       <p id="panel-status" class="status" role="status"></p>
+      <p class="hint">
+        Las cuentas nuevas se crean en Supabase (<em>Authentication → Users → Add user</em>).
+        Aparecen aquí sin ningún permiso hasta que las actives.
+      </p>
+      <div class="actions"><button id="logout" class="btn secondary" type="button">Cerrar sesión</button></div>
     </section>
   </main>
 

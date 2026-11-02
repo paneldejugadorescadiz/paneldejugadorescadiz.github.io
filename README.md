@@ -1,55 +1,61 @@
 # Panel de jugadores Cádiz
 
-Web estática (GitHub Pages) con un listado de jugadores de Cádiz de 2003 a 2007, a partir de datos públicos de [La Preferente](https://www.lapreferente.com/).
+Web estática (GitHub Pages) con un listado de jugadores de Cádiz nacidos entre 2003 y 2007. De uso personal: **los datos solo se ven con una cuenta que tenga permiso**.
 
 ## Cómo funciona
 
 ```
-Supabase (tabla players)  ──►  GitHub Action  ──►  data/*.json  ──►  Web pública
-        ▲                          ▲
-        │                          │
-   Panel admin  ──► Edge Function ─┘   (botón "Regenerar listas")
+Navegador ──(sesión de Supabase Auth)──► Supabase (tabla players)
+                                              │
+                         la base de datos decide con RLS si esa cuenta puede leer
 ```
 
-- La **web pública** (`index.html`) solo lee los archivos de `data/`. No depende de Supabase, así que sigue funcionando aunque la base de datos esté pausada.
-- **Supabase** guarda los datos en la tabla `players`: lectura pública, escritura solo para usuarios con rol `admin`.
-- El **panel de administrador** (`admin.html`) permite iniciar sesión y pulsar **Regenerar listas**.
-- El botón llama a la Edge Function `regenerate-lists`, que comprueba que eres administrador y lanza el workflow `regenerate-lists.yml`. Este lee la tabla, genera los JSON y los sube al repositorio como un commit.
-- Si una regeneración sale mal, basta con volver al commit anterior desde GitHub (`Revert`).
+- El repositorio solo contiene el código. **No hay datos en él**: viven en Supabase y solo se entregan a cuentas con permiso.
+- La clave `publishable` de `js/config.js` es pública por diseño. Sin una sesión con permiso, la base de datos no devuelve nada.
+- Cada cuenta tiene dos permisos **independientes**, guardados en la tabla `access`:
+  - **Ver los datos** (`can_view`): puede leer los jugadores en `index.html`.
+  - **Administrador** (`is_admin`): puede entrar en `admin.html` y gestionar permisos.
+- Quitar un permiso surte efecto al instante: la base de datos lo comprueba en cada consulta.
+- Nadie puede registrarse desde la web. Las cuentas las crea el propietario en Supabase.
+
+## Gestionar cuentas
+
+1. **Crear una cuenta:** en Supabase, *Authentication → Users → Add user* (correo y contraseña, con *Auto Confirm User* marcado).
+2. La cuenta aparece sola en `admin.html`, **sin ningún permiso**.
+3. En `admin.html`, activa *Ver los datos* y/o *Administrador*. Para retirar el acceso, desmarca la casilla.
+4. Para borrar una cuenta del todo: *Authentication → Users* en Supabase.
+
+Un administrador no puede quitarse a sí mismo el permiso de administrador, para no quedarse fuera.
+
+## Desactivar el registro (importante)
+
+En Supabase: *Authentication → Sign In / Providers → User Signups* → desactiva **Allow new users to sign up**. Así, aunque alguien llame a la API directamente, no puede crear cuentas.
 
 ## Estructura
 
 | Ruta | Para qué sirve |
 | --- | --- |
-| `index.html`, `css/`, `js/app.js` | Web pública con buscador y filtros |
-| `admin.html`, `js/admin.js` | Panel de administrador |
-| `js/config.js` | URL y clave pública de Supabase |
-| `data/` | JSON generados (`players.json`, `by-year/`, `meta.json`) |
-| `scripts/export-players.mjs` | Genera los JSON desde Supabase |
-| `supabase/functions/regenerate-lists/` | Función que lanza la regeneración |
-| `supabase/migrations/` | SQL de la tabla y sus políticas de seguridad |
-| `.github/workflows/` | `regenerate-lists.yml` y `keepalive.yml` |
-
-## Puesta en marcha
-
-1. **GitHub Pages:** en el repositorio, *Settings → Pages → Deploy from a branch → `main` / `/ (root)`*.
-2. **Usuario administrador:** en Supabase, *Authentication → Users → Add user*. Después hay que darle el rol:
-   ```sql
-   update auth.users
-   set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'
-   where email = 'tu-correo@ejemplo.com';
-   ```
-3. **Token de GitHub para el botón:** crea un token *fine-grained* limitado a este repositorio con el permiso **Actions: Read and write**, y guárdalo en Supabase como secreto `GITHUB_TOKEN` (*Edge Functions → Secrets*).
-4. Entra en `admin.html`, inicia sesión y pulsa **Regenerar listas**.
+| `index.html`, `js/app.js` | Web con inicio de sesión, buscador y filtros |
+| `admin.html`, `js/admin.js` | Gestión de cuentas y permisos |
+| `js/auth.js`, `js/config.js` | Cliente de Supabase y sesión |
+| `css/style.css` | Estilos |
+| `supabase/migrations/` | SQL de las tablas y las políticas de seguridad |
+| `supabase/functions/regenerate-lists/` | Función sin uso por ahora (ver abajo) |
+| `.github/workflows/keepalive.yml` | Consulta periódica para que Supabase no se pause |
 
 ## Mantener Supabase activo
 
-El plan gratuito de Supabase pausa los proyectos tras unos 7 días con poca actividad. `keepalive.yml` hace una consulta cada 3 días para evitarlo. Ojo: GitHub desactiva los workflows programados cuando un repositorio pasa 60 días sin actividad; si ocurre, vuelve a activarlo en la pestaña *Actions*.
+El plan gratuito de Supabase pausa los proyectos tras unos 7 días con poca actividad. `keepalive.yml` hace una consulta inocua cada 3 días. GitHub desactiva los workflows programados cuando un repositorio pasa 60 días sin actividad; si ocurre, vuelve a activarlo en la pestaña *Actions*.
+
+## Pendiente
+
+- **Bot de extracción:** la tabla `scrape_queue` y las columnas `position` y `photo_url` ya existen. Falta el script.
+- La función `regenerate-lists` y el token `GITHUB_TOKEN` quedaron de la primera versión, que generaba listas JSON públicas. Ya no se usan; se reaprovecharán para lanzar el bot desde el panel.
 
 ## Datos personales
 
-Los datos son públicos, pero siguen siendo datos personales (RGPD), y muchos jugadores eran menores cuando se publicaron. Conviene:
+Aunque las fichas sean públicas, siguen siendo datos personales (RGPD). Conviene:
 
-- Guardar solo lo necesario (nombre, año, club, categoría, temporada, enlace a la fuente), sin fotos.
+- Guardar solo lo necesario.
 - Revisar las condiciones de uso de La Preferente antes de importar datos.
-- Ofrecer un contacto para pedir la retirada de un dato.
+- Mantener el contacto de retirada de datos del pie de la web.

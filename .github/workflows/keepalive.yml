@@ -1,7 +1,8 @@
 name: Mantener Supabase activo
 
 # El plan gratuito de Supabase pausa los proyectos tras ~7 días con poca actividad.
-# Esta consulta periódica ayuda a evitarlo.
+# Esta consulta periódica ayuda a evitarlo. Usa una función que solo devuelve un 1,
+# sin tocar ningún dato.
 on:
   schedule:
     - cron: '0 6 */3 * *'
@@ -13,9 +14,11 @@ jobs:
     steps:
       - name: Consultar la base de datos
         run: |
-          curl --fail --silent --show-error \
-            "$SUPABASE_URL/rest/v1/players?select=id&limit=1" \
-            -H "apikey: $SUPABASE_KEY"
+          curl --fail --silent --show-error -X POST \
+            "$SUPABASE_URL/rest/v1/rpc/ping" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}'
         env:
           SUPABASE_URL: https://egutaqmgcpiqiicrgmfe.supabase.co
           SUPABASE_KEY: sb_publishable_-4qlTZ9LeFXzRxJ0T0_Fkw_8vZANs1L

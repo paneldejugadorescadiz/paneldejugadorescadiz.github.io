@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <title>Panel de jugadores Cádiz</title>
-  <meta name="description" content="Jugadores de Cádiz de 2003 a 2007 con datos públicos de La Preferente.">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <a class="skip" href="#resultados">Saltar a los resultados</a>
+  <a class="skip" href="#contenido">Saltar al contenido</a>
 
   <header class="hero">
     <div class="wrap">
       <h1>Jugadores de Cádiz</h1>
-      <p class="lede">De 2003 a 2007, con datos públicos de La Preferente.</p>
+      <p class="lede">Nacidos entre 2003 y 2007.</p>
 
-      <form id="search-form" class="search" role="search">
+      <form id="search-form" class="search" role="search" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
              stroke-linecap="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7"></circle>
@@ -27,32 +27,65 @@
     </div>
   </header>
 
-  <main class="wrap">
-    <section id="controls" class="controls" aria-label="Filtros">
-      <div id="years" class="years" role="group" aria-label="Año de nacimiento"></div>
-      <div class="club-field">
-        <label for="club">Club</label>
-        <select id="club"><option value="">Todos los clubes</option></select>
-      </div>
+  <main id="contenido" class="wrap">
+    <p id="view-loading" class="count">Cargando…</p>
+
+    <!-- Inicio de sesión -->
+    <section id="view-login" class="panel" hidden>
+      <h2>Iniciar sesión</h2>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">Correo electrónico</label>
+          <input id="email" class="input" type="email" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <input id="password" class="input" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="actions"><button class="btn" type="submit">Entrar</button></div>
+        <p id="login-status" class="status" role="status"></p>
+      </form>
     </section>
 
-    <section id="resultados" aria-label="Resultados">
-      <p id="count" class="count" aria-live="polite">Cargando…</p>
-      <ul id="rows" class="players"></ul>
-
-      <div id="empty" class="empty" hidden>
-        <p id="empty-text"></p>
-        <button id="reset" class="btn secondary" type="button">Quitar filtros</button>
-      </div>
-
-      <div class="more"><button id="more" class="btn" type="button" hidden>Mostrar más</button></div>
+    <!-- Sesión iniciada, pero sin permiso para ver los datos -->
+    <section id="view-noaccess" class="panel" hidden>
+      <h2>Tu cuenta no tiene acceso</h2>
+      <p class="meta">Pide al administrador que te dé permiso para ver los datos.</p>
+      <div class="actions"><button id="logout-noaccess" class="btn secondary" type="button">Cerrar sesión</button></div>
     </section>
+
+    <!-- Datos -->
+    <div id="view-app" hidden>
+      <section id="controls" class="controls" aria-label="Filtros">
+        <div id="years" class="years" role="group" aria-label="Año de nacimiento"></div>
+        <div class="club-field">
+          <label for="club">Club</label>
+          <select id="club"><option value="">Todos los clubes</option></select>
+        </div>
+      </section>
+
+      <section id="resultados" aria-label="Resultados">
+        <p id="count" class="count" aria-live="polite">Cargando…</p>
+        <ul id="rows" class="players"></ul>
+
+        <div id="empty" class="empty" hidden>
+          <p id="empty-text"></p>
+          <button id="reset" class="btn secondary" type="button">Quitar filtros</button>
+        </div>
+
+        <div class="more"><button id="more" class="btn" type="button" hidden>Mostrar más</button></div>
+      </section>
+    </div>
   </main>
 
   <footer class="site-footer">
     <div class="wrap">
       <p>Fuente de los datos: <a href="https://www.lapreferente.com/" rel="noopener noreferrer">lapreferente.com</a>. <span id="updated"></span></p>
-      <p><a href="admin.html">Acceso administrador</a></p>
+      <p>¿Apareces en esta lista y quieres que quitemos tus datos? Escribe a <a href="mailto:mistermakina08@gmail.com">mistermakina08@gmail.com</a>.</p>
+      <p>
+        <a href="admin.html">Acceso administrador</a>
+        <button id="logout" class="link-btn" type="button" hidden>Cerrar sesión</button>
+      </p>
     </div>
   </footer>
 

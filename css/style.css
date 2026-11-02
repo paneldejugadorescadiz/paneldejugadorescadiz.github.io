@@ -415,6 +415,48 @@ main.wrap { padding-top: 28px; padding-bottom: 48px; }
 
 .meta { margin: 4px 0; color: var(--muted); font-size: 0.95rem; }
 
+.panel.wide { max-width: 720px; }
+.panel .hint { margin: 16px 0 0; color: var(--muted); font-size: 0.9rem; }
+
+.accounts {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.account-email { min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.account-email small { display: block; font-weight: 400; color: var(--muted); }
+
+.switches { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--focus); }
+.check input:disabled { cursor: not-allowed; }
+
+.link-btn {
+  margin-left: 12px;
+  padding: 0;
+  font: inherit;
+  color: #fff;
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }

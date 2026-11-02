@@ -1,23 +1,43 @@
-// Página pública: lee los JSON generados (data/players.json y data/meta.json).
-// No necesita Supabase: si la base de datos está pausada, la web sigue funcionando.
+// Página principal. Los datos solo se piden a Supabase con una sesión iniciada,
+// y la base de datos solo los entrega a cuentas con permiso para verlos.
+import { supabase, getAccess, onSession, signIn, signOut, setStatus } from './auth.js';
 
 const PAGE_SIZE = 50;
+const FETCH_SIZE = 1000;
+const COLUMNS = 'id,full_name,birth_year,club,category,position,season,source_url,updated_at';
+
+const $ = (id) => document.getElementById(id);
 
 const els = {
-  form: document.getElementById('search-form'),
-  q: document.getElementById('q'),
-  years: document.getElementById('years'),
-  club: document.getElementById('club'),
-  count: document.getElementById('count'),
-  rows: document.getElementById('rows'),
-  empty: document.getElementById('empty'),
-  emptyText: document.getElementById('empty-text'),
-  reset: document.getElementById('reset'),
-  more: document.getElementById('more'),
-  updated: document.getElementById('updated'),
+  form: $('search-form'),
+  q: $('q'),
+  controls: $('controls'),
+  years: $('years'),
+  club: $('club'),
+  count: $('count'),
+  rows: $('rows'),
+  empty: $('empty'),
+  emptyText: $('empty-text'),
+  reset: $('reset'),
+  more: $('more'),
+  updated: $('updated'),
+  logout: $('logout'),
 };
 
-const state = { all: [], filtered: [], shown: 0, year: '' };
+const views = {
+  loading: $('view-loading'),
+  login: $('view-login'),
+  noaccess: $('view-noaccess'),
+  app: $('view-app'),
+};
+
+const state = { all: [], filtered: [], shown: 0, year: '', userId: null };
+
+function show(name) {
+  for (const [key, el] of Object.entries(views)) el.hidden = key !== name;
+  els.form.hidden = name !== 'app';
+  els.logout.hidden = name === 'login' || name === 'loading';
+}
 
 const normalize = (value) =>
   (value ?? '')
@@ -27,18 +47,31 @@ const normalize = (value) =>
     .toLowerCase()
     .trim();
 
-async function getJSON(path) {
-  const res = await fetch(`${path}?t=${Date.now()}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`${path}: ${res.status}`);
-  return res.json();
-}
-
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null && text !== '') node.textContent = text;
   return node;
 }
+
+/* ---------- Datos ---------- */
+
+async function fetchAllPlayers() {
+  const players = [];
+  for (let from = 0; ; from += FETCH_SIZE) {
+    const { data, error } = await supabase
+      .from('players')
+      .select(COLUMNS)
+      .order('id', { ascending: true })
+      .range(from, from + FETCH_SIZE - 1);
+    if (error) throw error;
+    players.push(...data);
+    if (data.length < FETCH_SIZE) break;
+  }
+  return players;
+}
+
+/* ---------- Pintado ---------- */
 
 function playerCard(p) {
   const li = el('li', 'player');
@@ -48,7 +81,7 @@ function playerCard(p) {
   main.append(el('h2', 'player-name', p.full_name));
   if (p.club) main.append(el('p', 'player-club', p.club));
 
-  const tags = [p.category, p.season].filter(Boolean);
+  const tags = [p.category, p.position, p.season].filter(Boolean);
   if (tags.length) {
     const list = el('div', 'tags');
     for (const tag of tags) list.append(el('span', 'tag', tag));
@@ -91,7 +124,7 @@ function updateStatus() {
   els.empty.hidden = total !== 0;
   if (total === 0) {
     els.emptyText.textContent = noData
-      ? 'Aún no hay jugadores publicados. Vuelve pronto.'
+      ? 'Aún no hay jugadores cargados.'
       : 'Ningún jugador coincide con esa búsqueda.';
     els.reset.hidden = noData || !hasActiveFilters();
   }
@@ -128,7 +161,10 @@ function showMore() {
 
 function buildYearChips(years, counts) {
   els.years.replaceChildren();
-  const options = [['', 'Todos', state.all.length], ...years.map((y) => [String(y), String(y), counts.get(y)])];
+  const options = [
+    ['', 'Todos', state.all.length],
+    ...years.map((y) => [String(y), String(y), counts.get(y)]),
+  ];
 
   for (const [value, label, count] of options) {
     const chip = el('button', 'chip');
@@ -149,18 +185,15 @@ function setYear(value) {
 }
 
 function fillClubs(clubs) {
-  for (const club of clubs) {
-    const option = document.createElement('option');
-    option.value = club;
-    option.textContent = club;
-    els.club.append(option);
-  }
+  els.club.replaceChildren(new Option('Todos los clubes', ''));
+  for (const club of clubs) els.club.append(new Option(club, club));
 }
 
-function showUpdated(meta) {
-  if (!meta?.generatedAt) return;
-  const date = new Date(meta.generatedAt);
-  if (Number.isNaN(date.getTime())) return;
+function showUpdated(players) {
+  els.updated.textContent = '';
+  const latest = players.reduce((max, p) => (p.updated_at > max ? p.updated_at : max), '');
+  const date = new Date(latest);
+  if (!latest || Number.isNaN(date.getTime())) return;
   const formatted = new Intl.DateTimeFormat('es-ES', {
     dateStyle: 'long',
     timeStyle: 'short',
@@ -176,38 +209,99 @@ function resetFilters() {
   els.q.focus();
 }
 
-async function init() {
-  try {
-    const [players, meta] = await Promise.all([
-      getJSON('data/players.json'),
-      getJSON('data/meta.json').catch(() => null),
-    ]);
+async function loadPlayers() {
+  const players = await fetchAllPlayers();
+  state.all = players.sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? '', 'es'));
 
-    state.all = [...players].sort((a, b) =>
-      (a.full_name ?? '').localeCompare(b.full_name ?? '', 'es'),
-    );
-
-    const counts = new Map();
-    for (const p of state.all) {
-      if (p.birth_year != null) counts.set(p.birth_year, (counts.get(p.birth_year) ?? 0) + 1);
-    }
-    const years = [...counts.keys()].sort((a, b) => a - b);
-    const clubs = [...new Set(state.all.map((p) => p.club).filter(Boolean))].sort((a, b) =>
-      a.localeCompare(b, 'es'),
-    );
-
-    buildYearChips(years, counts);
-    fillClubs(clubs);
-    showUpdated(meta);
-
-    // Sin datos no tiene sentido enseñar filtros.
-    document.getElementById('controls').hidden = state.all.length === 0;
-    applyFilters();
-  } catch (error) {
-    console.error(error);
-    els.count.textContent = 'No se pudieron cargar los datos. Recarga la página en unos minutos.';
+  const counts = new Map();
+  for (const p of state.all) {
+    if (p.birth_year != null) counts.set(p.birth_year, (counts.get(p.birth_year) ?? 0) + 1);
   }
+  const years = [...counts.keys()].sort((a, b) => a - b);
+  const clubs = [...new Set(state.all.map((p) => p.club).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'es'),
+  );
+
+  state.year = '';
+  buildYearChips(years, counts);
+  fillClubs(clubs);
+  showUpdated(state.all);
+
+  // Sin datos no tiene sentido enseñar filtros.
+  els.controls.hidden = state.all.length === 0;
+  applyFilters();
 }
+
+// Al cerrar sesión o perder el permiso no se deja ningún dato en pantalla ni en memoria.
+function clearData() {
+  state.all = [];
+  state.filtered = [];
+  state.shown = 0;
+  state.year = '';
+  state.userId = null;
+  els.rows.replaceChildren();
+  els.years.replaceChildren();
+  els.club.replaceChildren(new Option('Todos los clubes', ''));
+  els.q.value = '';
+  els.updated.textContent = '';
+}
+
+/* ---------- Sesión ---------- */
+
+let routeSeq = 0;
+
+async function route(session) {
+  const seq = ++routeSeq;
+
+  if (!session) {
+    clearData();
+    show('login');
+    return;
+  }
+
+  const access = await getAccess(session.user.id);
+  if (seq !== routeSeq) return;
+
+  if (!access?.can_view) {
+    clearData();
+    show('noaccess');
+    return;
+  }
+
+  if (state.userId !== session.user.id) {
+    show('loading');
+    try {
+      await loadPlayers();
+    } catch (error) {
+      console.error(error);
+      if (seq !== routeSeq) return;
+      els.controls.hidden = true;
+      els.rows.replaceChildren();
+      els.empty.hidden = true;
+      els.more.hidden = true;
+      els.count.hidden = false;
+      els.count.textContent = 'No se pudieron cargar los datos. Recarga la página en unos minutos.';
+      show('app');
+      return;
+    }
+    if (seq !== routeSeq) return;
+    state.userId = session.user.id;
+  }
+  show('app');
+}
+
+$('login-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const status = $('login-status');
+  setStatus(status, 'Entrando…');
+  const { error } = await signIn($('email').value.trim(), $('password').value);
+  if (error) {
+    setStatus(status, 'Correo o contraseña incorrectos.', 'error');
+  } else {
+    setStatus(status, '');
+    $('password').value = '';
+  }
+});
 
 els.form.addEventListener('submit', (event) => event.preventDefault());
 els.q.addEventListener('input', applyFilters);
@@ -218,5 +312,7 @@ els.years.addEventListener('click', (event) => {
 });
 els.more.addEventListener('click', showMore);
 els.reset.addEventListener('click', resetFilters);
+els.logout.addEventListener('click', () => signOut());
+$('logout-noaccess').addEventListener('click', () => signOut());
 
-init();
+onSession((_event, session) => route(session));

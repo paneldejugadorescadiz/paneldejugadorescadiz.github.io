@@ -1,122 +1,155 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './config.js';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// Panel de administrador: activar o quitar permisos a las cuentas.
+// Las cuentas no se crean aquí: se crean en Supabase y llegan sin ningún permiso.
+import { supabase, getAccess, onSession, signIn, signOut, setStatus } from './auth.js';
 
 const $ = (id) => document.getElementById(id);
+
 const views = {
+  loading: $('view-loading'),
   login: $('view-login'),
   denied: $('view-denied'),
   panel: $('view-panel'),
 };
 
-const POLL_EVERY_MS = 10_000;
-const POLL_MAX_TRIES = 18; // unos 3 minutos
+const PERMISSIONS = [
+  { field: 'can_view', label: 'Ver los datos' },
+  { field: 'is_admin', label: 'Administrador' },
+];
 
 function show(name) {
   for (const [key, el] of Object.entries(views)) el.hidden = key !== name;
 }
 
-function setStatus(el, message, kind = '') {
-  el.textContent = message;
-  el.className = `status ${kind}`.trim();
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null && text !== '') node.textContent = text;
+  return node;
 }
 
-// El rol se guarda en app_metadata, que solo se puede modificar desde el servidor.
-const isAdmin = (session) => session?.user?.app_metadata?.role === 'admin';
+/* ---------- Cuentas ---------- */
 
-async function getMeta() {
-  try {
-    const res = await fetch(`data/meta.json?t=${Date.now()}`, { cache: 'no-store' });
-    return res.ok ? await res.json() : null;
-  } catch {
-    return null;
+function accountRow(account, myId) {
+  const isMe = account.user_id === myId;
+  const li = el('li', 'account');
+
+  const who = el('div', 'account-email', account.email ?? '(sin correo)');
+  if (isMe) who.append(el('small', '', 'Esta es tu cuenta'));
+  else if (!account.can_view && !account.is_admin) who.append(el('small', '', 'Sin permisos todavía'));
+  li.append(who);
+
+  const switches = el('div', 'switches');
+  for (const { field, label } of PERMISSIONS) {
+    const wrapper = el('label', 'check');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = Boolean(account[field]);
+    input.dataset.userId = account.user_id;
+    input.dataset.field = field;
+    input.dataset.email = account.email ?? '';
+    input.dataset.label = label;
+
+    // Evita que te quites a ti mismo el permiso de administrador y te quedes fuera.
+    if (isMe && field === 'is_admin') {
+      input.disabled = true;
+      input.title = 'No puedes quitarte el permiso de administrador a ti mismo';
+    }
+    wrapper.append(input, label);
+    switches.append(wrapper);
   }
+  li.append(switches);
+  return li;
 }
 
-function formatDate(iso) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return 'desconocida';
-  return new Intl.DateTimeFormat('es-ES', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-    timeZone: 'Europe/Madrid',
-  }).format(date);
-}
-
-async function refreshMeta() {
-  const meta = await getMeta();
-  $('meta-info').textContent = meta?.generatedAt
-    ? `Últimas listas: ${formatDate(meta.generatedAt)} · ${meta.total ?? 0} jugadores.`
-    : 'Todavía no se han generado listas.';
-  return meta;
-}
-
-function route(session) {
-  if (!session) {
-    show('login');
-  } else if (isAdmin(session)) {
-    $('who').textContent = session.user.email ?? '';
-    show('panel');
-    refreshMeta();
-  } else {
-    show('denied');
-  }
-}
-
-async function functionErrorMessage(error) {
-  try {
-    const body = await error.context.json();
-    if (body?.error) return body.error;
-  } catch {
-    // la respuesta no era JSON
-  }
-  return error.message;
-}
-
-async function regenerate() {
-  const button = $('regenerate');
+async function loadAccounts(myId) {
   const status = $('panel-status');
-  button.disabled = true;
-  setStatus(status, 'Lanzando la regeneración…');
+  const list = $('accounts');
+  setStatus(status, '');
 
-  const before = (await getMeta())?.generatedAt ?? null;
-  const { error } = await supabase.functions.invoke('regenerate-lists');
+  const { data, error } = await supabase
+    .from('access')
+    .select('user_id,email,can_view,is_admin,created_at')
+    .order('created_at', { ascending: true });
 
   if (error) {
-    setStatus(status, `No se pudo lanzar: ${await functionErrorMessage(error)}`, 'error');
-    button.disabled = false;
+    console.error(error);
+    list.replaceChildren();
+    setStatus(status, 'No se pudieron cargar las cuentas. Recarga la página.', 'error');
     return;
   }
 
-  setStatus(status, 'Regeneración lanzada. Esperando a que se publiquen las listas (1–3 min)…');
+  list.replaceChildren(...data.map((account) => accountRow(account, myId)));
+  $('accounts-empty').hidden = data.length !== 0;
+}
 
-  for (let i = 0; i < POLL_MAX_TRIES; i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, POLL_EVERY_MS));
-    const meta = await getMeta();
-    if (meta?.generatedAt && meta.generatedAt !== before) {
-      await refreshMeta();
-      setStatus(status, `Listas actualizadas: ${meta.total ?? 0} jugadores.`, 'ok');
-      button.disabled = false;
-      return;
-    }
+async function onToggle(event) {
+  const input = event.target.closest('input[type="checkbox"]');
+  if (!input || !input.dataset.userId) return;
+
+  const { userId, field, email, label } = input.dataset;
+  const wanted = input.checked;
+  const status = $('panel-status');
+  input.disabled = true;
+  setStatus(status, 'Guardando…');
+
+  // Si la política de seguridad no deja cambiarlo, Supabase no da error: devuelve 0 filas.
+  const { data, error } = await supabase
+    .from('access')
+    .update({ [field]: wanted })
+    .eq('user_id', userId)
+    .select('user_id');
+
+  input.disabled = false;
+
+  if (error || !data || data.length !== 1) {
+    console.error(error);
+    input.checked = !wanted;
+    setStatus(status, `No se pudo cambiar «${label}» de ${email}.`, 'error');
+    return;
   }
 
-  setStatus(
-    status,
-    'Sigue en curso. Revisa la pestaña Actions del repositorio de GitHub.',
-  );
-  button.disabled = false;
+  setStatus(status, `${wanted ? 'Activado' : 'Quitado'}: «${label}» de ${email}.`, 'ok');
+  // Refresca la nota "Sin permisos todavía" de esa cuenta.
+  const row = input.closest('.account');
+  const checks = [...row.querySelectorAll('input[type="checkbox"]')];
+  const small = row.querySelector('.account-email small');
+  if (small && small.textContent === 'Sin permisos todavía' && checks.some((c) => c.checked)) {
+    small.remove();
+  }
+}
+
+/* ---------- Sesión ---------- */
+
+let routeSeq = 0;
+
+async function route(session) {
+  const seq = ++routeSeq;
+
+  if (!session) {
+    $('accounts').replaceChildren();
+    show('login');
+    return;
+  }
+
+  const access = await getAccess(session.user.id);
+  if (seq !== routeSeq) return;
+
+  if (!access?.is_admin) {
+    $('accounts').replaceChildren();
+    show('denied');
+    return;
+  }
+
+  $('who').textContent = session.user.email ?? '';
+  show('panel');
+  await loadAccounts(session.user.id);
 }
 
 $('login-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const status = $('login-status');
   setStatus(status, 'Entrando…');
-  const { error } = await supabase.auth.signInWithPassword({
-    email: $('email').value.trim(),
-    password: $('password').value,
-  });
+  const { error } = await signIn($('email').value.trim(), $('password').value);
   if (error) {
     setStatus(status, 'Correo o contraseña incorrectos.', 'error');
   } else {
@@ -125,9 +158,8 @@ $('login-form').addEventListener('submit', async (event) => {
   }
 });
 
-$('regenerate').addEventListener('click', regenerate);
-$('logout').addEventListener('click', () => supabase.auth.signOut());
-$('logout-denied').addEventListener('click', () => supabase.auth.signOut());
+$('accounts').addEventListener('change', onToggle);
+$('logout').addEventListener('click', () => signOut());
+$('logout-denied').addEventListener('click', () => signOut());
 
-supabase.auth.onAuthStateChange((_event, session) => route(session));
-supabase.auth.getSession().then(({ data }) => route(data.session));
+onSession((_event, session) => route(session));

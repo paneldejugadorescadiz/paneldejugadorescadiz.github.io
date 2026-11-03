@@ -18,6 +18,10 @@ Navegador ──(sesión de Supabase Auth)──► Supabase (tabla players)
 - Quitar un permiso surte efecto al instante: la base de datos lo comprueba en cada consulta.
 - Nadie puede registrarse desde la web. Las cuentas las crea el propietario en Supabase.
 
+## Favoritos
+
+Cada jugador tiene una estrella ☆. Los favoritos son **por cuenta**: cada una ve y cambia solo los suyos (tabla `favorites` con RLS, y solo si la cuenta tiene *Ver los datos*). El botón *★ Favoritos* de la web enseña únicamente tus favoritos, agrupados por posición, y respeta el buscador, el año y el club.
+
 ## Gestionar cuentas
 
 1. **Crear una cuenta:** en Supabase, *Authentication → Users → Add user* (correo y contraseña, con *Auto Confirm User* marcado).
@@ -70,6 +74,7 @@ Lee fichas de jugadores de La Preferente y las guarda en la tabla `players`. Tra
 **Qué hace y qué no:**
 
 - Respeta el `robots.txt`, solo visita `lapreferente.com`, espera 5 segundos entre peticiones y se identifica como `paneldejugadorescadiz-bot`.
+- Solo chicos: descarta (como `skipped: femenino`) las fichas cuya categoría o club sean femeninos.
 - Guarda nombre, año de nacimiento, club, categoría, posición, enlace a la ficha y enlace a la foto. **No guarda** la fecha de nacimiento completa ni el lugar de nacimiento. Solo guarda los nacidos entre 2003 y 2007; el resto queda como `skipped`.
 - Se detiene si la web responde 403, 429 o 503, si aparece una verificación de Cloudflare, o tras tres fallos seguidos. Una ficha bloqueada vuelve a la cola y se reintenta hasta 3 veces.
 - Los registros de GitHub son públicos, así que solo muestran identificadores de ficha, nunca nombres.

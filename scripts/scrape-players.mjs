@@ -150,6 +150,12 @@ async function processOne(row) {
     };
   }
 
+  // El panel es solo de chicos: se descartan las fichas de equipos o categorías femeninas.
+  const { club, category } = parsed.fields;
+  if (/femenin|\bfem\b|\(f\)/i.test(`${category ?? ''} ${club ?? ''}`)) {
+    return { status: 'skipped', reason: 'femenino', note: 'categoría o club femenino' };
+  }
+
   const { birth_year: year } = parsed.fields;
   if (year < MIN_YEAR || year > MAX_YEAR) {
     return { status: 'skipped', reason: 'fuera_de_rango', note: `año ${year}` };

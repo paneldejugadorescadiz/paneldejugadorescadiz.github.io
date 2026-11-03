@@ -22,6 +22,8 @@ const els = {
   more: $('more'),
   updated: $('updated'),
   logout: $('logout'),
+  views: $('view-switch'),
+  favCount: $('fav-count'),
 };
 
 const views = {
@@ -31,7 +33,14 @@ const views = {
   app: $('view-app'),
 };
 
-const state = { all: [], filtered: [], shown: 0, year: '', userId: null };
+const state = { all: [], filtered: [], shown: 0, year: '', userId: null, favs: new Set(), view: 'all' };
+
+const POSITION_ORDER = ['portero', 'defensa', 'lateral', 'central', 'centrocamp', 'medio', 'pivote', 'mediapunta', 'extremo', 'delantero'];
+const positionRank = (name) => {
+  const n = normalize(name);
+  const i = POSITION_ORDER.findIndex((key) => n.includes(key));
+  return i < 0 ? POSITION_ORDER.length : i;
+};
 
 function show(name) {
   for (const [key, el] of Object.entries(views)) el.hidden = key !== name;
@@ -71,6 +80,38 @@ async function fetchAllPlayers() {
   return players;
 }
 
+async function fetchFavorites() {
+  const { data, error } = await supabase.from('favorites').select('player_id');
+  if (error) throw error;
+  return new Set(data.map((row) => row.player_id));
+}
+
+async function toggleFavorite(player, button) {
+  const wanted = !state.favs.has(player.id);
+  button.disabled = true;
+  const query = wanted
+    ? supabase.from('favorites').insert({ player_id: player.id })
+    : supabase.from('favorites').delete().eq('player_id', player.id).eq('user_id', state.userId);
+  const { error } = await query;
+  button.disabled = false;
+  if (error) {
+    console.error(error);
+    els.count.textContent = 'No se pudo guardar el favorito. Inténtalo de nuevo.';
+    return;
+  }
+  if (wanted) state.favs.add(player.id);
+  else state.favs.delete(player.id);
+  els.favCount.textContent = state.favs.size;
+  if (state.view === 'favs') applyFilters();
+  else setStar(button, player, wanted);
+}
+
+function setStar(button, player, on) {
+  button.textContent = on ? '★' : '☆';
+  button.setAttribute('aria-pressed', String(on));
+  button.setAttribute('aria-label', `${on ? 'Quitar de' : 'Añadir a'} favoritos a ${player.full_name}`);
+}
+
 /* ---------- Pintado ---------- */
 
 function playerCard(p) {
@@ -88,6 +129,12 @@ function playerCard(p) {
     main.append(list);
   }
   li.append(main);
+
+  const star = el('button', 'star');
+  star.type = 'button';
+  setStar(star, p, state.favs.has(p.id));
+  star.addEventListener('click', () => toggleFavorite(p, star));
+  li.append(star);
 
   if (typeof p.source_url === 'string' && /^https:\/\//i.test(p.source_url)) {
     const link = el('a', 'player-link', 'Ver ficha');
@@ -125,14 +172,37 @@ function updateStatus() {
   if (total === 0) {
     els.emptyText.textContent = noData
       ? 'Aún no hay jugadores cargados.'
-      : 'Ningún jugador coincide con esa búsqueda.';
+      : state.view === 'favs' && state.favs.size === 0
+        ? 'Aún no tienes favoritos. Pulsa la estrella ☆ de un jugador para añadirlo.'
+        : 'Ningún jugador coincide con esa búsqueda.';
     els.reset.hidden = noData || !hasActiveFilters();
   }
 
   els.more.hidden = state.shown >= total;
 }
 
+function renderFavorites() {
+  els.rows.replaceChildren();
+  const groups = new Map();
+  for (const p of state.filtered) {
+    const key = p.position || 'Sin posición';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(p);
+  }
+  const names = [...groups.keys()].sort(
+    (a, b) => positionRank(a) - positionRank(b) || a.localeCompare(b, 'es'),
+  );
+  for (const name of names) {
+    const heading = el('li', 'group-title', `${name} · ${groups.get(name).length}`);
+    els.rows.append(heading);
+    appendCards(groups.get(name));
+  }
+  state.shown = state.filtered.length;
+  updateStatus();
+}
+
 function render() {
+  if (state.view === 'favs') return renderFavorites();
   els.rows.replaceChildren();
   state.shown = Math.min(PAGE_SIZE, state.filtered.length);
   appendCards(state.filtered.slice(0, state.shown));
@@ -147,7 +217,8 @@ function applyFilters() {
     (p) =>
       (!q || normalize(p.full_name).includes(q)) &&
       (!state.year || String(p.birth_year) === state.year) &&
-      (!club || p.club === club),
+      (!club || p.club === club) &&
+      (state.view === 'all' || state.favs.has(p.id)),
   );
   render();
 }
@@ -202,6 +273,18 @@ function showUpdated(players) {
   els.updated.textContent = `Última actualización: ${formatted}.`;
 }
 
+function setViewButtons() {
+  for (const btn of els.views.querySelectorAll('button')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.view === state.view));
+  }
+}
+
+function setView(view) {
+  state.view = view;
+  setViewButtons();
+  applyFilters();
+}
+
 function resetFilters() {
   els.q.value = '';
   els.club.value = '';
@@ -210,7 +293,11 @@ function resetFilters() {
 }
 
 async function loadPlayers() {
-  const players = await fetchAllPlayers();
+  const [players, favs] = await Promise.all([fetchAllPlayers(), fetchFavorites()]);
+  state.favs = favs;
+  state.view = 'all';
+  setViewButtons();
+  els.favCount.textContent = favs.size;
   state.all = players.sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? '', 'es'));
 
   const counts = new Map();
@@ -239,6 +326,8 @@ function clearData() {
   state.shown = 0;
   state.year = '';
   state.userId = null;
+  state.favs = new Set();
+  state.view = 'all';
   els.rows.replaceChildren();
   els.years.replaceChildren();
   els.club.replaceChildren(new Option('Todos los clubes', ''));
@@ -309,6 +398,10 @@ els.club.addEventListener('change', applyFilters);
 els.years.addEventListener('click', (event) => {
   const chip = event.target.closest('.chip');
   if (chip) setYear(chip.dataset.year);
+});
+els.views.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-view]');
+  if (btn) setView(btn.dataset.view);
 });
 els.more.addEventListener('click', showMore);
 els.reset.addEventListener('click', resetFilters);

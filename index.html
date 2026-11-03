@@ -57,6 +57,10 @@
     <!-- Datos -->
     <div id="view-app" hidden>
       <section id="controls" class="controls" aria-label="Filtros">
+        <div id="view-switch" class="view-switch" role="group" aria-label="Vista">
+          <button type="button" data-view="all" aria-pressed="true">Todos</button>
+          <button type="button" data-view="favs" aria-pressed="false">★ Favoritos <small id="fav-count">0</small></button>
+        </div>
         <div id="years" class="years" role="group" aria-label="Año de nacimiento"></div>
         <div class="club-field">
           <label for="club">Club</label>

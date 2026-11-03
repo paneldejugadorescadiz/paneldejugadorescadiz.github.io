@@ -41,16 +41,45 @@ En Supabase: *Authentication → Sign In / Providers → User Signups* → desac
 | `css/style.css` | Estilos |
 | `supabase/migrations/` | SQL de las tablas y las políticas de seguridad |
 | `supabase/functions/regenerate-lists/` | Función sin uso por ahora (ver abajo) |
+| `scripts/scrape-players.mjs`, `scripts/lib/ficha.mjs` | Bot de extracción de fichas y lector de fichas |
+| `.github/workflows/scrape-players.yml` | Lanza el bot a mano desde la pestaña *Actions* |
 | `.github/workflows/keepalive.yml` | Consulta periódica para que Supabase no se pause |
 
 ## Mantener Supabase activo
 
 El plan gratuito de Supabase pausa los proyectos tras unos 7 días con poca actividad. `keepalive.yml` hace una consulta inocua cada 3 días. GitHub desactiva los workflows programados cuando un repositorio pasa 60 días sin actividad; si ocurre, vuelve a activarlo en la pestaña *Actions*.
 
+## Bot de extracción
+
+Lee fichas de jugadores de La Preferente y las guarda en la tabla `players`. Trabaja con una **cola** (`scrape_queue`): solo procesa las URLs que tú metes en ella.
+
+**Preparación (una vez):** en GitHub, *Settings → Secrets and variables → Actions → New repository secret*, con el nombre `SUPABASE_SERVICE_ROLE_KEY` y la clave secreta (`service_role`) de Supabase, que está en *Project Settings → API Keys*. Esa clave nunca va en el código ni en el chat.
+
+**Cada prueba:**
+
+1. **Añadir URLs a la cola**, en el *SQL Editor* de Supabase:
+   ```sql
+   insert into public.scrape_queue (url) values
+     ('https://www.lapreferente.com/J000000C0/club/nombre.html'),
+     ('https://www.lapreferente.com/J000001C0/club/otro.html')
+   on conflict (url) do nothing;
+   ```
+2. **Ejecutar:** *Actions → Bot de extracción → Run workflow*, con el número de fichas (por defecto 10, máximo 50).
+3. **Ver el resultado:** en *Table Editor → scrape_queue*. Cada URL tiene `status` (`done`, `skipped`, `failed` o `pending`), `attempts`, `note` con el motivo y, si no entendió la página, `snippet` con el principio del texto para saber qué corregir. Los jugadores guardados aparecen en `players`.
+
+**Qué hace y qué no:**
+
+- Respeta el `robots.txt`, solo visita `lapreferente.com`, espera 5 segundos entre peticiones y se identifica como `paneldejugadorescadiz-bot`.
+- Guarda nombre, año de nacimiento, club, categoría, posición, enlace a la ficha y enlace a la foto. **No guarda** la fecha de nacimiento completa ni el lugar de nacimiento. Solo guarda los nacidos entre 2003 y 2007; el resto queda como `skipped`.
+- Se detiene si la web responde 403, 429 o 503, si aparece una verificación de Cloudflare, o tras tres fallos seguidos. Una ficha bloqueada vuelve a la cola y se reintenta hasta 3 veces.
+- Los registros de GitHub son públicos, así que solo muestran identificadores de ficha, nunca nombres.
+- La ejecución termina en rojo si alguna ficha falla o si se detiene: es intencionado, para que lo veas.
+- La foto se guarda por ahora como enlace al original. Copiarla a un almacenamiento privado queda para cuando el bot lea bien las fichas.
+
 ## Pendiente
 
-- **Bot de extracción:** la tabla `scrape_queue` y las columnas `position` y `photo_url` ya existen. Falta el script.
-- La función `regenerate-lists` y el token `GITHUB_TOKEN` quedaron de la primera versión, que generaba listas JSON públicas. Ya no se usan; se reaprovecharán para lanzar el bot desde el panel.
+- La función `regenerate-lists` y el token `GITHUB_TOKEN` quedaron de la primera versión, que generaba listas JSON públicas. Ya no se usan; se reaprovecharán para lanzar el bot desde el panel de administrador.
+- Recorrer equipos para llenar la cola automáticamente: hace falta ver cómo es una página de equipo.
 
 ## Datos personales
 

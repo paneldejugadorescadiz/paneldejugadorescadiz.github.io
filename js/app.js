@@ -4,7 +4,7 @@ import { supabase, getAccess, onSession, signIn, signOut, setStatus } from './au
 
 const PAGE_SIZE = 50;
 const FETCH_SIZE = 1000;
-const COLUMNS = 'id,full_name,birth_year,club,category,position,season,source_url,updated_at';
+const COLUMNS = 'id,full_name,birth_year,club,category,position,position_detail,season,source_url,updated_at';
 
 const $ = (id) => document.getElementById(id);
 
@@ -122,7 +122,7 @@ function playerCard(p) {
   main.append(el('h2', 'player-name', p.full_name));
   if (p.club) main.append(el('p', 'player-club', p.club));
 
-  const tags = [p.category, p.position, p.season].filter(Boolean);
+  const tags = [p.category, p.position, p.position_detail, p.season].filter(Boolean);
   if (tags.length) {
     const list = el('div', 'tags');
     for (const tag of tags) list.append(el('span', 'tag', tag));

@@ -95,6 +95,9 @@ function findName(lines, firstLabelIndex) {
   return null;
 }
 
+// Imágenes de relleno que la web usa cuando el jugador no tiene foto.
+const PLACEHOLDER = /(no-?disponible|sin-?foto|nofoto|no-?image|default|placeholder)/i;
+
 export function findPhoto(html, pageUrl, { allowHttp = false } = {}) {
   const candidates = [];
   const og =
@@ -106,11 +109,12 @@ export function findPhoto(html, pageUrl, { allowHttp = false } = {}) {
   let match;
   while ((match = IMG.exec(html))) {
     const src = match[1];
-    if (/(logo|icon|banner|escudo|flag|bandera|sprite|publi|\/ads?\/|pixel|spacer)/i.test(src)) continue;
+    if (PLACEHOLDER.test(src) || /(logo|icon|banner|escudo|flag|bandera|sprite|publi|\/ads?\/|pixel|spacer)/i.test(src)) continue;
     if (/\/(fotos?|jugadores?|players?|images?|imagenes|img|uploads)\//i.test(src)) candidates.push(['img', src]);
   }
 
   for (const [strategy, raw] of candidates) {
+    if (PLACEHOLDER.test(raw)) continue;
     let url;
     try {
       url = new URL(decodeEntities(raw), pageUrl);
@@ -126,8 +130,12 @@ export function findPhoto(html, pageUrl, { allowHttp = false } = {}) {
 
 export function sourceIdFromUrl(url) {
   try {
-    const match = /\/(J\d+)/i.exec(new URL(url).pathname);
-    return match ? match[1].toUpperCase() : null;
+    const u = new URL(url);
+    const match = /\/(J\d+)/i.exec(u.pathname);
+    if (match) return match[1].toUpperCase();
+    // Formato corto: https://www.lapreferente.com/?IDjugador=369139
+    const id = /^\d+$/.test(u.searchParams.get('IDjugador') ?? '') ? u.searchParams.get('IDjugador') : null;
+    return id ? `J${id}` : null;
   } catch {
     return null;
   }
@@ -193,7 +201,8 @@ export function parseFicha(html, pageUrl, options = {}) {
       birth_year: birthYear,
       club: found.club || null,
       category: found.category || null,
-      position: found.position_detail || found.position || null,
+      position: found.position || null,
+      position_detail: found.position_detail || null,
       photo_url: photo.url,
     },
     errors,

@@ -3,7 +3,7 @@
 // y añade a team_queue los equipos enlazados (rivales de su competición).
 //
 // Variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (obligatorias), LIMIT (equipos por ejecución,
-// 5 por defecto, máx. 30), DELAY_MS (5000), MIN_YEAR/MAX_YEAR (2003/2007), PROVINCE (Cádiz),
+// 5 por defecto, máx. 30), DELAY_MS (5000), MAX_AGE (23), PROVINCE (Cádiz),
 // CONTACT, SOURCE_ALLOWED_HOSTS, ALLOW_HTTP=1 (solo pruebas).
 // Reglas: respeta robots.txt, va despacio, se detiene ante 403/429/503 o desafío de Cloudflare.
 import { appendFile } from 'node:fs/promises';
@@ -21,8 +21,7 @@ if (!SUPABASE_URL || !KEY) {
 const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
 const LIMIT = clamp(parseInt(env.LIMIT, 10) || 5, 1, 30);
 const DELAY_MS = env.DELAY_MS != null && env.DELAY_MS !== '' && Number.isFinite(Number(env.DELAY_MS)) ? Math.max(0, Number(env.DELAY_MS)) : 5000;
-const MIN_YEAR = parseInt(env.MIN_YEAR, 10) || 2003;
-const MAX_YEAR = parseInt(env.MAX_YEAR, 10) || 2007;
+const MAX_AGE = parseInt(env.MAX_AGE, 10) || 23; // sub-23: menores de esta edad
 const PROVINCE = env.PROVINCE || 'Cádiz';
 const ALLOWED_HOSTS = (env.SOURCE_ALLOWED_HOSTS ?? 'www.lapreferente.com,lapreferente.com')
   .split(',').map((s) => s.trim()).filter(Boolean);
@@ -33,10 +32,9 @@ const FETCH_TIMEOUT_MS = 15000;
 const MAX_BYTES = 3_000_000;
 const MAX_NEW_TEAMS = 40;
 
-// Edad que tiene hoy quien nació entre MIN_YEAR y MAX_YEAR (con margen de un año por el cumpleaños).
-const THIS_YEAR = new Date().getFullYear();
-const AGE_MIN = THIS_YEAR - MAX_YEAR - 1;
-const AGE_MAX = THIS_YEAR - MIN_YEAR;
+// Prefiltro por edad: sub-23 (menos de MAX_AGE años); sin dato de edad también pasa y decide la ficha.
+const AGE_MIN = 0;
+const AGE_MAX = MAX_AGE - 1;
 
 const AGENT_TOKEN = 'paneldejugadorescadiz-bot';
 const USER_AGENT = `${AGENT_TOKEN}/1.0 (+https://paneldejugadorescadiz.github.io)` + (env.CONTACT ? ` ${env.CONTACT}` : '');

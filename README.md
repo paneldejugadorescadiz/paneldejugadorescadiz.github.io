@@ -1,6 +1,6 @@
 # Panel de jugadores Cádiz
 
-Web estática (GitHub Pages) con un listado de jugadores de Cádiz nacidos entre 2003 y 2007. De uso personal: **los datos solo se ven con una cuenta que tenga permiso**.
+Web estática (GitHub Pages) con un listado de jugadores de Cádiz sub-23 (menores de 23 años, de juvenil en adelante). De uso personal: **los datos solo se ven con una cuenta que tenga permiso**.
 
 ## Cómo funciona
 
@@ -81,7 +81,7 @@ Lee fichas de jugadores de La Preferente y las guarda en la tabla `players`. Tra
      ('https://www.lapreferente.com/E165C26706/cd-rayo-sanluque%C3%B1o')
    on conflict (url) do nothing;
    ```
-2. *Actions → Bot de equipos → Run workflow* (5 equipos por ejecución). Por cada equipo mira la provincia de su cabecera (`(Cádiz) - Fundado…`); si es Cádiz, añade a `scrape_queue` a los jugadores cuya edad encaja con 2003–2007 (o sin edad) y añade a `team_queue` los equipos de su competición. Los de otras provincias quedan `skipped: otra_provincia` y no se siguen.
+2. *Actions → Bot de equipos → Run workflow* (5 equipos por ejecución). Por cada equipo mira la provincia de su cabecera (`(Cádiz) - Fundado…`); si es Cádiz, añade a `scrape_queue` a los jugadores con menos de 23 años (o sin edad) y añade a `team_queue` los equipos de su competición. Los de otras provincias quedan `skipped: otra_provincia` y no se siguen.
 3. Después, *Actions → Bot de extracción* lee las fichas. La ficha decide el año de nacimiento real.
 
 Solo se descubren los equipos que salen en la clasificación de cada plantilla (su competición). Para llegar a juveniles u otras categorías, siembra un equipo de esa categoría.
@@ -90,7 +90,7 @@ Solo se descubren los equipos que salen en la clasificación de cada plantilla (
 
 - Respeta el `robots.txt`, solo visita `lapreferente.com`, espera 5 segundos entre peticiones y se identifica como `paneldejugadorescadiz-bot`.
 - Solo chicos: descarta (como `skipped: femenino`) las fichas cuya categoría o club sean femeninos.
-- Guarda nombre, año de nacimiento, club, categoría, posición, enlace a la ficha y enlace a la foto. **No guarda** la fecha de nacimiento completa ni el lugar de nacimiento. Solo guarda los nacidos entre 2003 y 2007; el resto queda como `skipped`.
+- Guarda nombre, año de nacimiento, club, categoría, posición, enlace a la ficha y enlace a la foto. **No guarda** la fecha de nacimiento completa ni el lugar de nacimiento. Solo guarda a menores de 23 años de categoría juvenil o superior (`MAX_AGE`); el resto queda como `skipped`. De los que tienen 18 años o menos no se guarda la foto.
 - Se detiene si la web responde 403, 429 o 503, si aparece una verificación de Cloudflare, o tras tres fallos seguidos. Una ficha bloqueada vuelve a la cola y se reintenta hasta 3 veces.
 - Los registros de GitHub son públicos, así que solo muestran identificadores de ficha, nunca nombres.
 - La ejecución termina en rojo si alguna ficha falla o si se detiene: es intencionado, para que lo veas.

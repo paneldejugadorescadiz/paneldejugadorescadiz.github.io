@@ -5,7 +5,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY    obligatoria (clave de servicio; nunca va en el código)
 //   LIMIT                        fichas por ejecución (por defecto 10, máximo 50)
 //   DELAY_MS                     pausa entre peticiones (por defecto 5000)
-//   MIN_YEAR / MAX_YEAR          años de nacimiento que se guardan (2003 / 2007)
+//   MAX_AGE                      se guardan menores de esta edad (23 = sub-23), de juvenil en adelante
 //   CONTACT                      opcional: se añade a la identificación del bot
 //   SOURCE_ALLOWED_HOSTS         opcional: por defecto www.lapreferente.com,lapreferente.com
 //   ALLOW_HTTP=1                 solo para pruebas locales
@@ -27,8 +27,12 @@ if (!SUPABASE_URL || !KEY) {
 const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
 const LIMIT = clamp(parseInt(env.LIMIT, 10) || 10, 1, 50);
 const DELAY_MS = Math.max(0, Number.isFinite(Number(env.DELAY_MS)) && env.DELAY_MS !== '' && env.DELAY_MS != null ? Number(env.DELAY_MS) : 5000);
-const MIN_YEAR = parseInt(env.MIN_YEAR, 10) || 2003;
-const MAX_YEAR = parseInt(env.MAX_YEAR, 10) || 2007;
+// Sub-23: se guarda quien tiene menos de MAX_AGE años (por año de nacimiento) y juega en juvenil o superior.
+const THIS_YEAR = new Date().getFullYear();
+const MAX_AGE = parseInt(env.MAX_AGE, 10) || 23;
+const MIN_YEAR = THIS_YEAR - MAX_AGE + 1;
+const NO_PHOTO_AGE = 18; // hasta esta edad (por año de nacimiento) no se guarda la foto
+const BELOW_JUVENIL = /prebenjam|benjam|alev[ií]n|infantil|cadete/i;
 const ALLOWED_HOSTS = (env.SOURCE_ALLOWED_HOSTS ?? 'www.lapreferente.com,lapreferente.com')
   .split(',').map((s) => s.trim()).filter(Boolean);
 const ALLOW_HTTP = env.ALLOW_HTTP === '1';
@@ -156,10 +160,16 @@ async function processOne(row) {
     return { status: 'skipped', reason: 'femenino', note: 'categoría o club femenino' };
   }
 
+  if (BELOW_JUVENIL.test(category ?? '')) {
+    return { status: 'skipped', reason: 'categoria_inferior', note: String(category) };
+  }
+
   const { birth_year: year } = parsed.fields;
-  if (year < MIN_YEAR || year > MAX_YEAR) {
+  if (year < MIN_YEAR || year > THIS_YEAR) {
     return { status: 'skipped', reason: 'fuera_de_rango', note: `año ${year}` };
   }
+  // Menores (o casi): se guardan los datos deportivos pero no la foto.
+  if (THIS_YEAR - year <= NO_PHOTO_AGE) parsed.fields.photo_url = null;
 
   await db('players?on_conflict=source_id', {
     method: 'POST',

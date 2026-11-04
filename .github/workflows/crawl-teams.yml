@@ -1,0 +1,37 @@
+name: Bot de equipos
+
+# Se lanza a mano desde la pestaña Actions. Recorre las plantillas pendientes (tabla team_queue),
+# y para los equipos de la provincia añade a scrape_queue los jugadores con la edad buscada.
+# Después se ejecuta "Bot de extracción" para leer esas fichas.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Cuántos equipos recorrer (máximo 30)'
+        required: true
+        default: '5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scrape-players
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Recorrer equipos
+        run: node scripts/crawl-teams.mjs
+        env:
+          SUPABASE_URL: https://egutaqmgcpiqiicrgmfe.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LIMIT: ${{ inputs.limit }}

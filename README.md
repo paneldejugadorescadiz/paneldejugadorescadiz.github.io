@@ -46,6 +46,8 @@ En Supabase: *Authentication → Sign In / Providers → User Signups* → desac
 | `supabase/migrations/` | SQL de las tablas y las políticas de seguridad |
 | `supabase/functions/regenerate-lists/` | Función sin uso por ahora (ver abajo) |
 | `scripts/scrape-players.mjs`, `scripts/lib/ficha.mjs` | Bot de extracción de fichas y lector de fichas |
+| `scripts/crawl-teams.mjs`, `scripts/lib/team.mjs` | Bot de equipos: recorre plantillas y llena la cola de fichas |
+| `.github/workflows/crawl-teams.yml` | Lanza el bot de equipos a mano |
 | `.github/workflows/scrape-players.yml` | Lanza el bot a mano desde la pestaña *Actions* |
 | `.github/workflows/keepalive.yml` | Consulta periódica para que Supabase no se pause |
 
@@ -71,6 +73,19 @@ Lee fichas de jugadores de La Preferente y las guarda en la tabla `players`. Tra
 2. **Ejecutar:** *Actions → Bot de extracción → Run workflow*, con el número de fichas (por defecto 10, máximo 50).
 3. **Ver el resultado:** en *Table Editor → scrape_queue*. Cada URL tiene `status` (`done`, `skipped`, `failed` o `pending`), `attempts`, `note` con el motivo y, si no entendió la página, `snippet` con el principio del texto para saber qué corregir. Los jugadores guardados aparecen en `players`.
 
+**Llenar la cola sola (bot de equipos):** en vez de pegar enlaces, siembra un equipo y deja que el bot recorra plantillas.
+
+1. Siembra un equipo de la provincia en el *SQL Editor*:
+   ```sql
+   insert into public.team_queue (url) values
+     ('https://www.lapreferente.com/E165C26706/cd-rayo-sanluque%C3%B1o')
+   on conflict (url) do nothing;
+   ```
+2. *Actions → Bot de equipos → Run workflow* (5 equipos por ejecución). Por cada equipo mira la provincia de su cabecera (`(Cádiz) - Fundado…`); si es Cádiz, añade a `scrape_queue` a los jugadores cuya edad encaja con 2003–2007 (o sin edad) y añade a `team_queue` los equipos de su competición. Los de otras provincias quedan `skipped: otra_provincia` y no se siguen.
+3. Después, *Actions → Bot de extracción* lee las fichas. La ficha decide el año de nacimiento real.
+
+Solo se descubren los equipos que salen en la clasificación de cada plantilla (su competición). Para llegar a juveniles u otras categorías, siembra un equipo de esa categoría.
+
 **Qué hace y qué no:**
 
 - Respeta el `robots.txt`, solo visita `lapreferente.com`, espera 5 segundos entre peticiones y se identifica como `paneldejugadorescadiz-bot`.
@@ -84,7 +99,7 @@ Lee fichas de jugadores de La Preferente y las guarda en la tabla `players`. Tra
 ## Pendiente
 
 - La función `regenerate-lists` y el token `GITHUB_TOKEN` quedaron de la primera versión, que generaba listas JSON públicas. Ya no se usan; se reaprovecharán para lanzar el bot desde el panel de administrador.
-- Recorrer equipos para llenar la cola automáticamente: hace falta ver cómo es una página de equipo.
+- Subir las fotos a un almacenamiento privado.
 
 ## Datos personales
 
